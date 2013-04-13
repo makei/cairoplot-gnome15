@@ -126,6 +126,10 @@ class Plot(object):
         self.line_width = 0.5
         self.label_color = (0.0, 0.0, 0.0)
         self.grid_color = (0.8, 0.8, 0.8)
+        self.bounding_box = True
+        self.display_labels = True
+        self.display_x_labels = True
+        self.display_y_labels = True
     
     def create_surface(self, surface, width=None, height=None):
         self.filename = None
@@ -152,7 +156,7 @@ class Plot(object):
             self.context.show_page()
             if self.filename and self.filename.endswith(".png"):
                 self.surface.write_to_png(self.filename)
-            else:
+            elif self.filename:
                 self.surface.finish()
         except cairo.Error:
             pass
@@ -396,13 +400,13 @@ class ScatterPlot( Plot ):
             self.errors[VERT] = [errory]
     
     def calc_labels(self):
-        if not self.labels[HORZ]:
+        if self.labels[HORZ] is None:
             amplitude = self.bounds[HORZ][1] - self.bounds[HORZ][0]
             if amplitude % 10: #if horizontal labels need floating points
                 self.labels[HORZ] = ["%.2lf" % (float(self.bounds[HORZ][0] + (amplitude * i / 10.0))) for i in range(11) ]
             else:
                 self.labels[HORZ] = ["%d" % (int(self.bounds[HORZ][0] + (amplitude * i / 10.0))) for i in range(11) ]
-        if not self.labels[VERT]:
+        if self.labels[VERT] is None:
             amplitude = self.bounds[VERT][1] - self.bounds[VERT][0]
             if amplitude % 10: #if vertical labels need floating points
                 self.labels[VERT] = ["%.2lf" % (float(self.bounds[VERT][0] + (amplitude * i / 10.0))) for i in range(11) ]
@@ -411,8 +415,9 @@ class ScatterPlot( Plot ):
 
     def calc_extents(self, direction):
         self.context.set_font_size(self.font_size * 0.8)
-        self.max_value[direction] = max(self.context.text_extents(item)[2] for item in self.labels[direction])
-        self.borders[other_direction(direction)] = self.max_value[direction] + self.border + 20
+        label_extents= ( self.context.text_extents(item)[2] for item in self.labels[direction] ) if self.labels[direction] else [ 0 ]  
+        self.max_value[direction] = max(label_extents)
+        self.borders[other_direction(direction)] = self.max_value[direction] + self.border + 10
 
     def calc_boundaries(self):
         #HORZ = 0, VERT = 1, NORM = 2
@@ -476,12 +481,14 @@ class ScatterPlot( Plot ):
         self.calc_all_extents()
         self.calc_steps()
         self.render_background()
-        self.render_bounding_box()
+        if self.bounding_box:
+            self.render_bounding_box()
         if self.axis:
             self.render_axis()
         if self.grid:
             self.render_grid()
-        self.render_labels()
+        if self.display_labels:
+            self.render_labels()
         self.render_plot()
         if self.errors:
             self.render_errors()
@@ -538,8 +545,10 @@ class ScatterPlot( Plot ):
     
     def render_labels(self):
         self.context.set_font_size(self.font_size * 0.8)
-        self.render_horz_labels()
-        self.render_vert_labels()
+        if self.display_x_labels:
+            self.render_horz_labels()
+        if self.display_y_labels:
+            self.render_vert_labels()
     
     def render_horz_labels(self):
         cr = self.context
@@ -1000,7 +1009,8 @@ class BarPlot(Plot):
             self.render_ground()
         if self.display_values:
             self.render_values()
-        self.render_labels()
+        if self.display_labels:
+            self.render_labels()
         self.render_plot()
         if self.series_labels:
             self.render_legend()
@@ -1050,9 +1060,9 @@ class BarPlot(Plot):
 
     def render_labels(self):
         self.context.set_font_size(self.font_size * 0.8)
-        if self.labels[HORZ]:
+        if self.display_x_labels and self.labels[HORZ]:
             self.render_horz_labels()
-        if self.labels[VERT]:
+        if self.display_y_labels and self.labels[VERT]:
             self.render_vert_labels()
             
     def render_legend(self):
@@ -1834,7 +1844,8 @@ class GanttChart (Plot) :
         self.calc_steps()
         self.render_background()
 
-        self.render_labels()
+        if self.display_labels:
+            self.render_labels()
         self.render_grid()
         self.render_plot()
 
@@ -1866,8 +1877,10 @@ class GanttChart (Plot) :
     def render_labels(self):
         self.context.set_font_size(0.02 * self.dimensions[HORZ])
 
-        self.render_horz_labels()
-        self.render_vert_labels()
+        if self.display_x_labels:
+            self.render_horz_labels()
+        if self.display_y_labels:
+            self.render_vert_labels()
 
     def render_horz_labels(self):
         cr = self.context

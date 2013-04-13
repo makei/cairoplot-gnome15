@@ -1,0 +1,13 @@
+Metadata-Version: 1.0
+Name: Cairoplot
+Version: 1.1
+Summary: Cairoplot
+Home-page: http://linil.wordpress.com/2008/09/16/cairoplot-11/
+Author: UNKNOWN
+Author-email: UNKNOWN
+License: GNU LGPL 2.1
+Description: 
+                Using Python and PyCairo to develop a module to plot graphics in an
+                easy and intuitive way, creating beautiful results for presentations.
+                
+Platform: UNKNOWN

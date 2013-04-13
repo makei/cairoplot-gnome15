@@ -226,12 +226,11 @@ class Plot(object):
                     #element has 4 elements, might be rgba tuple or rgb tuple with mode
                     elif len( color ) == 4 :
                         #last element is mode
-                        if not hasattr(color[3], "__iter__"):
+                        if hasattr(color[3], "__iter__"):
                             self.series_colors[index] += tuple([color[3]])
                             self.series_colors[index][3] = 1.0
-                        #last element is alpha
                         else:
-                            self.series_colors[index] += tuple([mode])
+                            self.series_colors[index] += tuple("solid")
 
     def get_width(self):
         return self.surface.get_width()
@@ -1002,7 +1001,8 @@ class BarPlot(Plot):
         self.calc_all_extents()
         self.calc_steps()
         self.render_background()
-        self.render_bounding_box()
+        if self.bounding_box:
+            self.render_bounding_box()
         if self.grid:
             self.render_grid()
         if self.three_dimension:
@@ -1471,6 +1471,107 @@ class VerticalBarPlot(BarPlot):
                     
                     x0 += inner_step
     
+    
+class AreaPlot(VerticalBarPlot):
+    def __init__(self, 
+                 surface = None,
+                 data = None,
+                 width = 640,
+                 height = 480,
+                 background = "white light_gray",
+                 border = 0,
+                 display_values = False,
+                 grid = False,
+                 series_labels = None,
+                 x_labels = None,
+                 y_labels = None,
+                 x_bounds = None,
+                 y_bounds = None,
+                 series_colors = None,
+                 fill_colors = None):
+  
+        self.fill_colors = fill_colors
+        VerticalBarPlot.__init__(self, surface, data, width, height, background, border, 
+                         display_values, grid, False, False, False,
+                         series_labels,
+                         x_labels, y_labels, x_bounds, y_bounds, series_colors)  
+        
+    def calc_steps(self):
+        other_dir = other_direction(self.main_dir)
+        self.series_amplitude = self.bounds[self.main_dir][1] - self.bounds[self.main_dir][0]
+        if self.series_amplitude:
+            self.steps[self.main_dir] = float(self.plot_dimensions[self.main_dir])/self.series_amplitude
+        else:
+            self.steps[self.main_dir] = 0.00
+        series_length = 1
+        self.steps[other_dir] = float(self.plot_dimensions[other_dir])/(series_length + 0.1*(series_length + 1))
+        self.space = 0.1*self.steps[other_dir]
+        
+    def process_colors( self, series_colors, length = None, mode = 'solid' ):
+        Plot.process_colors(self, series_colors, length, mode)
+        #no colors passed
+        if not self.fill_colors:
+            #Randomize colors
+#            self.fill_colors = [ [random.random() for i in range(3)] + [1.0, mode]  for series in range( length ) ]
+            self.fill_colors = self.series_colors
+        else:
+            #no colors passed
+            if not hasattr( series_colors, "__iter__" ):
+                theme = series_colors
+                self.fill_colors = colors_from_theme( theme.lower(), length )
+                
+            #Theme pattern and mode
+            elif not hasattr(series_colors, '__delitem__') and not hasattr( series_colors[0], "__iter__" ):
+                theme = series_colors[0]
+                mode = series_colors[1]
+                self.fill_colors = colors_from_theme( theme.lower(), length, mode )
+                    
+            #List
+            else:
+                self.fill_colors = series_colors
+                for index, color in enumerate( self.fill_colors ):
+                    #element is a color name
+                    if not hasattr(color, "__iter__"):
+                        self.fill_colors[index] = COLORS[color.lower()] + tuple([mode])
+                    #element is rgb tuple instead of rgba
+                    elif len( color ) == 3 :
+                        self.fill_colors[index] += (1.0,mode)
+                    #element has 4 elements, might be rgba tuple or rgb tuple with mode
+                    elif len( color ) == 4 :
+                        #last element is mode
+                        if hasattr(color[3], "__iter__"):
+                            self.series_colors[index] += tuple([color[3]])
+                            self.series_colors[index][3] = 1.0
+        
+    def render_plot(self):
+        for i,group in enumerate(self.series):
+            inner_step = self.steps[HORZ]/len(group)
+            x0 = self.borders[HORZ]
+            
+            self.context.set_source_rgba(*self.series_colors[i][:4])
+            self.context.set_line_width(self.series_widths[i])
+                
+            self.render_area(x0, inner_step, group)
+            self.context.stroke()
+            self.render_area(x0, inner_step, group)
+            self.context.set_source_rgba(*self.fill_colors[i][:4])
+            self.context.fill()
+            
+    def render_area(self, x0, inner_step, group):
+        for number,data in enumerate(group):
+            this_x = x0 + inner_step / 2
+            this_y = self.plot_top - data.content*self.steps[VERT]
+              
+            if number == 0:                    
+                self.context.move_to(self.borders[HORZ] + inner_step / 2, self.plot_top)
+            self.context.line_to(this_x, this_y)
+            
+            x0 += inner_step
+            
+        self.context.line_to(x0 - inner_step / 2, self.plot_top)                
+        self.context.line_to(self.borders[HORZ] + inner_step / 2, self.plot_top)
+    
+    
 class StreamChart(VerticalBarPlot):
     def __init__(self, 
                  surface = None,
@@ -1688,7 +1789,8 @@ class PiePlot(Plot):
 
     def render(self):
         self.render_background()
-        self.render_bounding_box()
+        if self.bounding_box:
+            self.render_bounding_box()
         if self.shadow:
             self.render_shadow()
         self.render_plot()
